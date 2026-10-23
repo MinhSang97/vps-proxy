@@ -36,12 +36,16 @@ REM --- chay proxy nen ---
 echo Starting proxy on port !PORT!...
 start "vps-proxy" /min proxy.exe
 
-REM --- ngrok ---
-set "NGROK=ngrok"
+REM --- ngrok: tu tai neu chua co ---
+set "NGROK="
+where ngrok >nul 2>nul && set "NGROK=ngrok"
 if exist "ngrok.exe" set "NGROK=ngrok.exe"
-where ngrok >nul 2>nul || if not exist "ngrok.exe" (
-  echo Thieu ngrok. Tai ngrok.exe o https://ngrok.com/download bo vao thu muc nay roi chay lai.
-  exit /b 1
+if "!NGROK!"=="" (
+  echo Tai ngrok...
+  curl -sL -o ngrok.zip https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip
+  tar -xf ngrok.zip ngrok.exe
+  del ngrok.zip >nul 2>nul
+  if exist "ngrok.exe" ( set "NGROK=ngrok.exe" ) else ( echo Tai ngrok that bai, tai tay o https://ngrok.com/download & exit /b 1 )
 )
 if not "!NGROK_TOKEN!"=="" %NGROK% config add-authtoken !NGROK_TOKEN! >nul 2>nul
 echo.
