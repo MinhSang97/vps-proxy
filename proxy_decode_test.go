@@ -78,8 +78,8 @@ func TestLiveDecodeStoresMessageRows(t *testing.T) {
 				t.Fatalf("message row has no cmd: %+v", r)
 			}
 			text := ""
-			if ts := nro.Text(r.Data); len(ts) > 0 {
-				text = ts[0]
+			if len(r.Text) > 0 {
+				text = r.Text[0] // read the stored text field, not re-decoded here
 			}
 			msgs = append(msgs, got{r.Dir, *r.Cmd, text})
 		}

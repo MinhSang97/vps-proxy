@@ -283,7 +283,7 @@ func (d *dumpFile) decode(peer, dir string, b []byte) {
 	for _, m := range msgs {
 		cmd := m.Cmd
 		d.sink.put(logRecord{Kind: "message", Proto: d.proto, Peer: peer, Dir: m.Dir,
-			Cmd: &cmd, Name: m.Name(), N: len(m.Data), Data: m.Data})
+			Cmd: &cmd, Name: m.Name(), N: len(m.Data), Data: m.Data, Text: nro.Text(m.Data)})
 	}
 }
 

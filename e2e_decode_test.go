@@ -112,14 +112,16 @@ func TestEndToEndLiveDecode(t *testing.T) {
 	}
 	// Spot-check one decoded payload is human-readable again.
 	var row struct {
-		Data []byte `bson:"data"`
+		Data []byte   `bson:"data"`
+		Text []string `bson:"text"`
 	}
 	err = cli.Database(db).Collection(coll).FindOne(ctx, bson.M{"kind": "message", "cmd": -29}).Decode(&row)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ts := nro.Text(row.Data); len(ts) == 0 || ts[0] != "Dang nhap thanh cong" {
-		t.Errorf("decoded -29 payload = %q, want 'Dang nhap thanh cong'", nro.Text(row.Data))
+	// The stored text field is what makes the login readable straight in Atlas.
+	if len(row.Text) == 0 || row.Text[0] != "Dang nhap thanh cong" {
+		t.Errorf("stored text = %q, want 'Dang nhap thanh cong'", row.Text)
 	}
 	cli.Database(db).Collection(coll).Drop(ctx)
 }
