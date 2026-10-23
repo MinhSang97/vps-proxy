@@ -32,8 +32,9 @@ type logRecord struct {
 	Cmd   *int8     `bson:"cmd,omitempty"`  // set only on decoded message rows; a pointer so cmd 0 (LOGIN) still stores
 	Name  string    `bson:"name,omitempty"` // command name on message rows
 	N     int       `bson:"n,omitempty"`
-	Data  []byte    `bson:"data,omitempty"`
-	Text  []string  `bson:"text,omitempty"` // readable strings pulled from a message payload (username, chat, ...)
+	Data  []byte    `bson:"data,omitempty"` // raw bytes, on packet rows
+	Dump  string    `bson:"dump,omitempty"` // decrypted payload as a readable hexdump, on message rows
+	Text  []string  `bson:"text,omitempty"` // readable strings pulled from the payload (username, chat, ...)
 	Line  string    `bson:"line,omitempty"`
 }
 

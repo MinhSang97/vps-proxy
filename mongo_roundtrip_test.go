@@ -36,15 +36,16 @@ func TestMongoMessageRowRoundTrip(t *testing.T) {
 	}
 	cmd := int8(-72)
 	sink.put(logRecord{Kind: "message", Proto: "tcp", Peer: "game:14445", Dir: "C>S",
-		Cmd: &cmd, Name: "CHAT_PLAYER", N: 5, Data: []byte("hello")})
+		Cmd: &cmd, Name: "CHAT_PLAYER", N: 5, Dump: "hexdump here", Text: []string{"hello"}})
 	sink.close() // flushes
 
 	var got struct {
-		Kind string `bson:"kind"`
-		Dir  string `bson:"dir"`
-		Cmd  *int8  `bson:"cmd"`
-		Name string `bson:"name"`
-		Data []byte `bson:"data"`
+		Kind string   `bson:"kind"`
+		Dir  string   `bson:"dir"`
+		Cmd  *int8    `bson:"cmd"`
+		Name string   `bson:"name"`
+		Dump string   `bson:"dump"`
+		Text []string `bson:"text"`
 	}
 	err = cli.Database(db).Collection(coll).FindOne(ctx, bson.M{"kind": "message"}).Decode(&got)
 	if err != nil {
@@ -53,7 +54,7 @@ func TestMongoMessageRowRoundTrip(t *testing.T) {
 	if got.Cmd == nil || *got.Cmd != -72 {
 		t.Errorf("cmd round-tripped as %v, want -72", got.Cmd)
 	}
-	if got.Name != "CHAT_PLAYER" || got.Dir != "C>S" || string(got.Data) != "hello" {
+	if got.Name != "CHAT_PLAYER" || got.Dir != "C>S" || len(got.Text) != 1 || got.Text[0] != "hello" {
 		t.Errorf("row = %+v, want CHAT_PLAYER C>S hello", got)
 	}
 	cli.Database(db).Collection(coll).Drop(ctx)

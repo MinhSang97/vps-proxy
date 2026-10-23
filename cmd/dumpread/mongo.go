@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"os"
 	"time"
 
@@ -67,10 +68,10 @@ func readMongo(uri, db, coll, only string) ([]record, error) {
 	return out, cur.Err()
 }
 
-// backfillText fills the text field on message rows captured before that field
-// existed, so their readable strings (logins, chat) show up in Atlas too. It
-// only touches rows that have no text yet and whose payload actually decodes to
-// some text, and never changes the stored data. Returns how many rows it set.
+// backfillText rewrites message rows captured before the payload was stored as
+// text: it turns their binary data into a readable hexdump, pulls out the text
+// strings, and drops the binary. Only rows that still lack a dump are touched,
+// so it is safe to run again. Returns how many rows it rewrote.
 func backfillText(uri, db, coll string) (int, error) {
 	opts := options.Client().ApplyURI(uri).SetServerSelectionTimeout(8 * time.Second)
 	if user := os.Getenv("MONGO_USERNAME"); user != "" {
@@ -84,7 +85,7 @@ func backfillText(uri, db, coll string) (int, error) {
 	defer client.Disconnect(ctx)
 	c := client.Database(db).Collection(coll)
 
-	cur, err := c.Find(ctx, bson.M{"kind": "message", "text": bson.M{"$exists": false}})
+	cur, err := c.Find(ctx, bson.M{"kind": "message", "dump": bson.M{"$exists": false}})
 	if err != nil {
 		return 0, err
 	}
@@ -99,13 +100,13 @@ func backfillText(uri, db, coll string) (int, error) {
 		if err := cur.Decode(&r); err != nil {
 			return 0, err
 		}
-		texts := nro.Text(r.Data)
-		if len(texts) == 0 {
-			continue
+		set := bson.M{"dump": hex.Dump(r.Data)}
+		if texts := nro.Text(r.Data); len(texts) > 0 {
+			set["text"] = texts
 		}
 		models = append(models, mongo.NewUpdateOneModel().
 			SetFilter(bson.M{"_id": r.ID}).
-			SetUpdate(bson.M{"$set": bson.M{"text": texts}}))
+			SetUpdate(bson.M{"$set": set, "$unset": bson.M{"data": ""}}))
 	}
 	if err := cur.Err(); err != nil {
 		return 0, err
