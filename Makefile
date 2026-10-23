@@ -2,8 +2,6 @@
 
 BIN  := proxy
 NGROK      = $(if $(wildcard ./ngrok),./ngrok,ngrok)
-BORE       = $(if $(wildcard ./bore),./bore,bore)
-BORE_URL   := https://github.com/ekzhang/bore/releases/download/v0.6.0/bore-v0.6.0-x86_64-unknown-linux-musl.tar.gz
 NGROK_CFG  ?= $(HOME)/.config/ngrok/ngrok.yml
 MONGO_NAME ?= vps-proxy-mongo
 MONGO_PORT ?= 27017
@@ -63,9 +61,6 @@ mongo-shell:    ## mo shell mongo de tu truy van
 mongo-down:     ## dung container mongo (du lieu van con trong volume)
 	-docker stop $(MONGO_NAME)
 
-bore-local:     ## tai bore ve thu muc nay neu chua co (khong can the, khong can tai khoan)
-	@test -x ./bore || { echo "tai bore..."; curl -sL $(BORE_URL) | tar xz bore && echo "xong: $$(./bore --version)"; }
-
 env:            ## tao .env tu .env.example va bat buoc doi mat khau proxy
 	@test -f .env || { cp .env.example .env; echo "da tao .env tu .env.example"; }
 	@grep -qE '^PROXY_AUTH=.+:.+' .env || { \
@@ -74,18 +69,17 @@ env:            ## tao .env tu .env.example va bat buoc doi mat khau proxy
 	  echo "PROXY_AUTH trong .env van la mac dinh user:pass."; \
 	  echo "Doi thanh mat khau rieng truoc khi mo proxy ra internet."; exit 1; } || true
 
-up: env build dumpread mongo-up bore-local  ## MOT LENH: mongo + proxy + bore.pub, Ctrl+C tat het
+up: env build dumpread mongo-up ngrok-local ngrok-setup  ## MOT LENH: mongo + proxy + ngrok, Ctrl+C tat het
 	@./$(BIN) & PID=$$!; \
 	  trap "kill -INT $$PID 2>/dev/null" EXIT; \
 	  trap "kill -INT $$PID 2>/dev/null; exit 0" INT TERM; \
-	  sleep 1; echo "=> dung: http://<user>:<pass>@bore.pub:<PORT o dong duoi>"; echo "=> doc log: ./dumpread"; \
-	  $(BORE) local $(HTTP_PORT) --to bore.pub
+	  sleep 1; \
+	  echo "=> dia chi ngrok o duoi: tcp://<host>:<PORT>"; \
+	  echo "=> AutoPro proxy:  http:<host>:<PORT>:<user>:<pass>"; echo "=> doc log: ./dumpread"; \
+	  $(NGROK) tcp $(HTTP_PORT)
 
-up-ngrok: build ngrok-local ngrok-setup  ## nhu up nhung qua ngrok (CAN khai the ngrok)
-	@./$(BIN) & PID=$$!; trap "kill $$PID 2>/dev/null" EXIT INT TERM; sleep 1; $(NGROK) tcp $(HTTP_PORT)
-
-tunnel:         ## chi mo bore (proxy phai dang chay san)
-	$(BORE) local $(HTTP_PORT) --to bore.pub
+tunnel:         ## chi mo ngrok (proxy phai dang chay san)
+	$(NGROK) tcp $(HTTP_PORT)
 
 logs:           ## xem log tren VPS
 	ssh $(VPS) journalctl -u proxy -f
@@ -96,4 +90,4 @@ clean:
 help:
 	@grep -hE '^[a-z-]+:.*##' $(MAKEFILE_LIST) | sed 's/:.*##/\t/'
 
-.PHONY: env run-proxy build dumpread test mongo-up mongo-shell mongo-down deploy bore-local ngrok-local ngrok-setup tunnel up up-ngrok logs clean help
+.PHONY: env run-proxy build dumpread test mongo-up mongo-shell mongo-down deploy ngrok-local ngrok-setup tunnel up logs clean help

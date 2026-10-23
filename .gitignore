@@ -2,10 +2,10 @@
 # The leading slash matters: a bare "dumpread" would also ignore cmd/dumpread/.
 /proxy
 /dumpread
-/bore
 /ngrok
 
 # Local config and captures
 /.env
 /proxy.log
 /dumps/
+/bore
