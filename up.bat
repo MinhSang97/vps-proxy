@@ -44,10 +44,8 @@ where bore >nul 2>nul && set "BORE=bore"
 if exist "bore.exe" set "BORE=bore.exe"
 if "!BORE!"=="" (
   echo Tai bore...
-  curl -sL -o bore.zip https://github.com/ekzhang/bore/releases/download/v0.6.0/bore-v0.6.0-x86_64-pc-windows-msvc.zip
-  tar -xf bore.zip bore.exe
-  del bore.zip >nul 2>nul
-  if exist "bore.exe" ( set "BORE=bore.exe" ) else ( echo Tai bore that bai. & exit /b 1 )
+  powershell -NoProfile -Command "try { Invoke-WebRequest -Uri 'https://github.com/ekzhang/bore/releases/download/v0.6.0/bore-v0.6.0-x86_64-pc-windows-msvc.zip' -OutFile 'bore.zip'; Expand-Archive -LiteralPath 'bore.zip' -DestinationPath '.' -Force; Remove-Item 'bore.zip' } catch { exit 1 }"
+  if exist "bore.exe" ( set "BORE=bore.exe" ) else ( echo Tai bore that bai, tai tay o https://github.com/ekzhang/bore/releases & exit /b 1 )
 )
 
 echo.
