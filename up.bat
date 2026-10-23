@@ -22,6 +22,9 @@ for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
 for /f "tokens=2 delims=:" %%P in ("!HTTP_ADDR!") do set "PORT=%%P"
 if "!PORT!"=="" set "PORT=8080"
 
+REM --- dung proxy cu neu dang chay (tranh loi ghi de exe / trung cong) ---
+taskkill /f /im proxy.exe >nul 2>nul
+
 REM --- build + chay proxy ---
 where go >nul 2>nul && ( echo Building proxy.exe... & go build -o proxy.exe . )
 if not exist "proxy.exe" (
