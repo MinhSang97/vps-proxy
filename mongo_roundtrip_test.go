@@ -36,7 +36,7 @@ func TestMongoMessageRowRoundTrip(t *testing.T) {
 	}
 	cmd := int8(-72)
 	sink.put(logRecord{Kind: "message", Proto: "tcp", Peer: "game:14445", Dir: "C>S",
-		Cmd: &cmd, Name: "CHAT_PLAYER", N: 5, Dump: "hexdump here", Text: []string{"hello"}})
+		Cmd: &cmd, Name: "CHAT_PLAYER", N: 5, Dump: []string{"00000000  68 65 6c 6c 6f  |hello|"}, Text: []string{"hello"}})
 	sink.close() // flushes
 
 	var got struct {
@@ -44,7 +44,7 @@ func TestMongoMessageRowRoundTrip(t *testing.T) {
 		Dir  string   `bson:"dir"`
 		Cmd  *int8    `bson:"cmd"`
 		Name string   `bson:"name"`
-		Dump string   `bson:"dump"`
+		Dump []string `bson:"dump"`
 		Text []string `bson:"text"`
 	}
 	err = cli.Database(db).Collection(coll).FindOne(ctx, bson.M{"kind": "message"}).Decode(&got)

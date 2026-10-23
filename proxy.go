@@ -286,7 +286,7 @@ func (d *dumpFile) decode(peer, dir string, b []byte) {
 		// binary field shows up as useless Base64 in a database browser, while a
 		// hexdump shows the ASCII column so logins and chat are readable on sight.
 		d.sink.put(logRecord{Kind: "message", Proto: d.proto, Peer: peer, Dir: m.Dir,
-			Cmd: &cmd, Name: m.Name(), N: len(m.Data), Dump: hex.Dump(m.Data), Text: nro.Text(m.Data)})
+			Cmd: &cmd, Name: m.Name(), N: len(m.Data), Dump: dumpLines(m.Data), Text: nro.Text(m.Data)})
 	}
 }
 
@@ -300,6 +300,16 @@ type dumpSide struct {
 func (s *dumpSide) Write(b []byte) (int, error) {
 	s.d.write(s.d.peer, s.dir, b)
 	return len(b), nil
+}
+
+// dumpLines renders a payload as hexdump lines. One element per line keeps a
+// database browser from truncating it the way it truncates a long string.
+func dumpLines(b []byte) []string {
+	d := hex.Dump(b)
+	if d == "" {
+		return nil
+	}
+	return strings.Split(strings.TrimRight(d, "\n"), "\n")
 }
 
 // newDump opens the capture for one tunnel. Returns nil when DUMP_DIR is unset

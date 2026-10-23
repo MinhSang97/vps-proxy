@@ -33,7 +33,7 @@ type logRecord struct {
 	Name  string    `bson:"name,omitempty"` // command name on message rows
 	N     int       `bson:"n,omitempty"`
 	Data  []byte    `bson:"data,omitempty"` // raw bytes, on packet rows
-	Dump  string    `bson:"dump,omitempty"` // decrypted payload as a readable hexdump, on message rows
+	Dump  []string  `bson:"dump,omitempty"` // decrypted payload as hexdump lines, on message rows (an array so a browser shows every line, not a truncated string)
 	Text  []string  `bson:"text,omitempty"` // readable strings pulled from the payload (username, chat, ...)
 	Line  string    `bson:"line,omitempty"`
 }

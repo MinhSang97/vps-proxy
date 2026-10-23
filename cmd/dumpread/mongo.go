@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/hex"
 	"os"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -85,7 +86,7 @@ func backfillText(uri, db, coll string) (int, error) {
 	defer client.Disconnect(ctx)
 	c := client.Database(db).Collection(coll)
 
-	cur, err := c.Find(ctx, bson.M{"kind": "message", "dump": bson.M{"$exists": false}})
+	cur, err := c.Find(ctx, bson.M{"kind": "message"})
 	if err != nil {
 		return 0, err
 	}
@@ -93,19 +94,28 @@ func backfillText(uri, db, coll string) (int, error) {
 
 	var models []mongo.WriteModel
 	for cur.Next(ctx) {
-		var r struct {
-			ID   bson.ObjectID `bson:"_id"`
-			Data []byte        `bson:"data"`
-		}
-		if err := cur.Decode(&r); err != nil {
+		var doc bson.M
+		if err := cur.Decode(&doc); err != nil {
 			return 0, err
 		}
-		set := bson.M{"dump": hex.Dump(r.Data)}
-		if texts := nro.Text(r.Data); len(texts) > 0 {
+		var lines, texts []string
+		switch {
+		case hasBinary(doc["data"]):
+			// Still in the original shape: decrypted bytes stored as binary.
+			b := doc["data"].(bson.Binary).Data
+			lines, texts = dumpLines(b), nro.Text(b)
+		case isString(doc["dump"]):
+			// An earlier pass left the hexdump as one long string; split it.
+			lines = strings.Split(strings.TrimRight(doc["dump"].(string), "\n"), "\n")
+		default:
+			continue // already an array of lines, or nothing to convert
+		}
+		set := bson.M{"dump": lines}
+		if len(texts) > 0 {
 			set["text"] = texts
 		}
 		models = append(models, mongo.NewUpdateOneModel().
-			SetFilter(bson.M{"_id": r.ID}).
+			SetFilter(bson.M{"_id": doc["_id"]}).
 			SetUpdate(bson.M{"$set": set, "$unset": bson.M{"data": ""}}))
 	}
 	if err := cur.Err(); err != nil {
@@ -119,4 +129,24 @@ func backfillText(uri, db, coll string) (int, error) {
 		return 0, err
 	}
 	return int(res.ModifiedCount), nil
+}
+
+// dumpLines renders a payload as hexdump lines, one per element, matching the
+// shape the proxy now stores so a browser shows every line without truncating.
+func dumpLines(b []byte) []string {
+	d := hex.Dump(b)
+	if d == "" {
+		return nil
+	}
+	return strings.Split(strings.TrimRight(d, "\n"), "\n")
+}
+
+func hasBinary(v any) bool {
+	b, ok := v.(bson.Binary)
+	return ok && len(b.Data) > 0
+}
+
+func isString(v any) bool {
+	_, ok := v.(string)
+	return ok
 }
