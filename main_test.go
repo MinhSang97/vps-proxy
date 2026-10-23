@@ -268,3 +268,33 @@ func TestMongoFailureDoesNotStopTheProxy(t *testing.T) {
 		t.Errorf("dumpDir = %q, want %q so the capture still lands in the log", dumpDir, "-")
 	}
 }
+
+// TestDumpMongoWithoutURIStillCaptures pins a silent failure: DUMP_DIR=mongo
+// with no MONGO_URI left newDump with nothing to write to, so the proxy ran
+// and recorded absolutely nothing without a word about it.
+func TestDumpMongoWithoutURIStillCaptures(t *testing.T) {
+	defer func(dir, note string, sink *mongoSink) {
+		dumpDir, mongoNote, mongoLog = dir, note, sink
+	}(dumpDir, mongoNote, mongoLog)
+	dumpDir, mongoNote, mongoLog = "", "", nil
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("DUMP_DIR=mongo\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{"DUMP_DIR", "MONGO_URI"} {
+		if old, ok := os.LookupEnv(k); ok {
+			os.Unsetenv(k)
+			defer os.Setenv(k, old)
+		}
+	}
+
+	loadConfig(filepath.Join(dir, ".env"))
+
+	if dumpDir != "-" {
+		t.Errorf("dumpDir = %q, want %q so packets still reach the log", dumpDir, "-")
+	}
+	if mongoNote == "" {
+		t.Error("no note explaining why the capture is not going to mongo")
+	}
+}

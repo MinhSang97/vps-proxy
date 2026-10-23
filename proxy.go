@@ -606,19 +606,21 @@ func loadConfig(path string) {
 	dumpDir = os.Getenv("DUMP_DIR")
 	if uri := os.Getenv("MONGO_URI"); uri != "" {
 		sink, err := openMongo(uri, envOr("MONGO_DB", "vps_proxy"), envOr("MONGO_COLL", "logs"))
-		switch {
-		case err == nil:
+		if err == nil {
 			mongoLog = sink
-		case dumpDir == "mongo":
-			// Proxying is the job; recording is not. A database the proxy
-			// cannot reach must not keep the tunnel down, and must not leave
-			// it recording nothing either, so the capture falls back to the
-			// log file and says so loudly.
-			mongoNote = fmt.Sprintf("mongo  unreachable (%v), capture falls back to the log file", err)
-			dumpDir = "-"
-		default:
-			mongoNote = fmt.Sprintf("mongo  unreachable (%v), log lines stay in the file only", err)
+		} else {
+			mongoNote = fmt.Sprintf("mongo  unreachable (%v)", err)
 		}
+	}
+	// Proxying is the job; recording is not. Whether the database is
+	// unreachable or was never configured, the capture must not silently
+	// become nothing: it falls back to the log file and says so.
+	if dumpDir == "mongo" && mongoLog == nil {
+		dumpDir = "-"
+		if mongoNote == "" {
+			mongoNote = "mongo  DUMP_DIR=mongo but MONGO_URI is empty"
+		}
+		mongoNote += ", capture falls back to the log file"
 	}
 }
 

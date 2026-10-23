@@ -18,6 +18,9 @@ import (
 )
 
 func main() {
+	// Load .env the same way the proxy does, so the two tools share one config.
+	// Must run before the flag defaults below, which read the environment.
+	loadDotEnv(".env")
 	proto := flag.String("proto", "auto", "protocol: auto, nro (Ngoc Rong Online), or raw to skip decoding")
 	frame := flag.String("frame", "auto", "framing to use: auto, none, or a name from the table dumpread prints")
 	max := flag.Int("max", 64, "payload bytes to print per message, 0 for all")
@@ -220,6 +223,31 @@ func show(label string, recs []record, proto, want string, key []byte, max int) 
 }
 
 // envOr reads a setting with a fallback, the same way the proxy does.
+// loadDotEnv reads KEY=value lines; a real environment variable always wins.
+// Copied from the proxy so dumpread and proxy read the same .env the same way.
+func loadDotEnv(path string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, val, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		if _, set := os.LookupEnv(key); !set {
+			os.Setenv(key, strings.Trim(strings.TrimSpace(val), `"'`))
+		}
+	}
+}
+
 func envOr(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v

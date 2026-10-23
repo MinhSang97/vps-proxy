@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
@@ -16,7 +17,13 @@ func readMongo(uri, db, coll, only string) ([]record, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	client, err := mongo.Connect(options.Client().ApplyURI(uri).SetServerSelectionTimeout(8 * time.Second))
+	opts := options.Client().ApplyURI(uri).SetServerSelectionTimeout(8 * time.Second)
+	// Credentials as their own settings, matching the proxy: a password with
+	// special characters would otherwise have to be percent-encoded into the URI.
+	if user := os.Getenv("MONGO_USERNAME"); user != "" {
+		opts.SetAuth(options.Credential{Username: user, Password: os.Getenv("MONGO_PASS")})
+	}
+	client, err := mongo.Connect(opts)
 	if err != nil {
 		return nil, err
 	}

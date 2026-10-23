@@ -10,6 +10,7 @@ package main
 import (
 	"context"
 	"log"
+	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -47,7 +48,16 @@ type mongoSink struct {
 func openMongo(uri, db, coll string) (*mongoSink, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	client, err := mongo.Connect(options.Client().ApplyURI(uri).SetServerSelectionTimeout(8 * time.Second))
+	opts := options.Client().ApplyURI(uri).SetServerSelectionTimeout(8 * time.Second)
+	// Credentials as settings of their own rather than buried in the URI. A
+	// password holding @ : / ? or # has to be percent-encoded to survive a
+	// URI, and getting that wrong surfaces as "authentication failed", which
+	// reads exactly like a wrong password and sends you looking in the wrong
+	// place. Credentials already inside the URI still work.
+	if user := os.Getenv("MONGO_USERNAME"); user != "" {
+		opts.SetAuth(options.Credential{Username: user, Password: os.Getenv("MONGO_PASS")})
+	}
+	client, err := mongo.Connect(opts)
 	if err != nil {
 		return nil, err
 	}
