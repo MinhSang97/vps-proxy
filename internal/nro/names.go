@@ -5,9 +5,9 @@
 // server dispatches on; the positive values in that file are sub-commands
 // reused across several parents, so a flat table would name them wrongly.
 
-package main
+package nro
 
-var nroNames = map[int8]string{
+var Names = map[int8]string{
 	-127: "LUCKY_ROUND",
 	-126: "QUAYSO",
 	-125: "CLIENT_INPUT",

@@ -15,6 +15,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"vps-proxy/internal/nro"
 )
 
 func main() {
@@ -316,7 +318,7 @@ func reportNRO(recs []record, asked bool, key []byte, max int) bool {
 			clear = " (before the key, plaintext)"
 		}
 		fmt.Printf("\n#%d  %s  %s  cmd=%d %s  %d bytes%s\n", i+1, m.when, m.dir, m.cmd, m.name(), len(m.data), clear)
-		if texts := nroText(m.data); len(texts) > 0 {
+		if texts := nro.Text(m.data); len(texts) > 0 {
 			for _, t := range texts {
 				fmt.Printf("    text: %q\n", t)
 			}

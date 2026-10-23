@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
+	"vps-proxy/internal/nro"
 )
 
 // nroWriter builds a stream the way the game server does, so the decoder is
@@ -115,10 +116,10 @@ func TestNRODecode(t *testing.T) {
 	}
 
 	// The point of decrypting: the payload reads as text again.
-	if names := nroText(s.msgs[1].data); len(names) != 2 || names[0] != "sangnm" || names[1] != "matkhau" {
+	if names := nro.Text(s.msgs[1].data); len(names) != 2 || names[0] != "sangnm" || names[1] != "matkhau" {
 		t.Errorf("client login strings = %q, want [sangnm matkhau]", names)
 	}
-	if msg := nroText(s.msgs[3].data); len(msg) != 1 || msg[0] != "Dang nhap thanh cong" {
+	if msg := nro.Text(s.msgs[3].data); len(msg) != 1 || msg[0] != "Dang nhap thanh cong" {
 		t.Errorf("server strings = %q, want [Dang nhap thanh cong]", msg)
 	}
 	if n := s.msgs[4].name(); n != "GET_EFFDATA" {
@@ -186,7 +187,7 @@ func TestNROResyncWithoutHandshake(t *testing.T) {
 
 	var texts []string
 	for _, m := range s.msgs {
-		texts = append(texts, nroText(m.data)...)
+		texts = append(texts, nro.Text(m.data)...)
 	}
 	for _, want := range []string{"client noi 11", "server noi 11", "client noi 3"} {
 		found := false
@@ -228,14 +229,14 @@ func TestNROResyncRejectsLuckyAlignment(t *testing.T) {
 		t.Fatalf("resync failed: %v", err)
 	}
 	for _, m := range s.msgs {
-		if !nroCommands[m.cmd] {
+		if !nro.Commands[m.cmd] {
 			t.Errorf("decoded a message on command %d, which the game has no case for: %q",
 				m.cmd, m.data)
 		}
 	}
 	for _, m := range s.msgs {
 		if m.dir == "C>S" {
-			if m.cmd == -29 || len(nroText(m.data)) == 0 {
+			if m.cmd == -29 || len(nro.Text(m.data)) == 0 {
 				t.Errorf("first client message is cmd=%d %q, want a real chat message",
 					m.cmd, m.data)
 			}

@@ -7,9 +7,9 @@
 // is realigned by looking for one of these, so the set is evidence of a
 // message boundary, never a reason to reject a message already decoded.
 
-package main
+package nro
 
-var nroCommands = map[int8]bool{
+var Commands = map[int8]bool{
 	-127: true,
 	-126: true,
 	-125: true,

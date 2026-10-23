@@ -26,6 +26,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"vps-proxy/internal/nro"
 )
 
 func main() {
@@ -215,6 +217,10 @@ var dumpDir string
 // mongoLog is the open database sink, nil when MONGO_URI is unset.
 var mongoLog *mongoSink
 
+// nroLong is the client-version flag for live NRO decoding (2.4.2+). The bundled
+// client is 2.4.7, so it defaults on; NRO_LONG=0 turns it off.
+var nroLong = true
+
 // mongoNote carries what went wrong reaching the database. It is held rather
 // than printed because the config is read before the log knows where to write,
 // and a warning about a degraded capture belongs in the log file.
@@ -226,6 +232,7 @@ type dumpFile struct {
 	mu    sync.Mutex
 	f     *os.File   // nil writes into the main log instead
 	sink  *mongoSink // when set, records become rows and f is unused
+	conn  *nro.Conn  // live NRO decoder, set only for TCP tunnels going to mongo
 	proto string     // tcp or udp
 	peer  string     // the host this tunnel was opened for
 }
@@ -235,10 +242,11 @@ type dumpFile struct {
 // alike: "<time> dump <proto> <peer> <dir> <n> bytes".
 func (d *dumpFile) write(peer, dir string, b []byte) {
 	if d.sink != nil {
-		// No lock: put is safe to call from both directions at once, and the
-		// sequence it stamps keeps them in order.
+		// No lock on the raw row: put is safe from both directions at once and
+		// its sequence keeps them in order.
 		d.sink.put(logRecord{Kind: "packet", Proto: d.proto, Peer: peer, Dir: dir,
 			N: len(b), Data: append([]byte(nil), b...)})
+		d.decode(peer, dir, b)
 		return
 	}
 	d.mu.Lock()
@@ -249,6 +257,34 @@ func (d *dumpFile) write(peer, dir string, b []byte) {
 	}
 	fmt.Fprintf(d.f, "%s dump %s %s %s %d bytes\n%s\n",
 		time.Now().Format("15:04:05.000"), d.proto, peer, dir, len(b), hex.Dump(b))
+}
+
+// decode feeds the bytes to the live NRO decoder and stores one row per whole
+// message. It runs off the raw capture, so a decoder fault can never cost the
+// tunnel its bytes; recover keeps a bad message from taking the proxy down.
+// Conn.Feed mutates shared state, so it holds the per-tunnel lock, but the lock
+// is dropped before the rows are queued.
+func (d *dumpFile) decode(peer, dir string, b []byte) {
+	if d.conn == nil {
+		return
+	}
+	var msgs []nro.Message
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("nro    %s: decoder panic, giving up on this tunnel: %v", peer, r)
+				d.conn = nil
+			}
+		}()
+		d.mu.Lock()
+		defer d.mu.Unlock()
+		msgs = d.conn.Feed(dir == "C>S", b)
+	}()
+	for _, m := range msgs {
+		cmd := m.Cmd
+		d.sink.put(logRecord{Kind: "message", Proto: d.proto, Peer: peer, Dir: m.Dir,
+			Cmd: &cmd, Name: m.Name(), N: len(m.Data), Data: m.Data})
+	}
 }
 
 // dumpSide adapts one direction of a stream to io.Writer. UDP skips it and
@@ -275,7 +311,11 @@ func newDump(proto, peer string) (*dumpFile, func()) {
 		if mongoLog == nil {
 			return nil, func() {}
 		}
-		return &dumpFile{sink: mongoLog, proto: proto, peer: peer}, func() {}
+		d := &dumpFile{sink: mongoLog, proto: proto, peer: peer}
+		if proto == "tcp" {
+			d.conn = nro.NewConn(nroLong) // decode game messages alongside the raw bytes
+		}
+		return d, func() {}
 	}
 	if err := os.MkdirAll(dumpDir, 0o750); err != nil {
 		log.Printf("dump   %s: %v", peer, err)
@@ -604,6 +644,9 @@ func envOr(key, fallback string) string {
 func loadConfig(path string) {
 	loadDotEnv(path)
 	dumpDir = os.Getenv("DUMP_DIR")
+	if os.Getenv("NRO_LONG") == "0" {
+		nroLong = false
+	}
 	if uri := os.Getenv("MONGO_URI"); uri != "" {
 		sink, err := openMongo(uri, envOr("MONGO_DB", "vps_proxy"), envOr("MONGO_COLL", "logs"))
 		if err == nil {

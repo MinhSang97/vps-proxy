@@ -29,6 +29,8 @@ type logRecord struct {
 	Proto string    `bson:"proto,omitempty"`
 	Peer  string    `bson:"peer,omitempty"`
 	Dir   string    `bson:"dir,omitempty"`
+	Cmd   *int8     `bson:"cmd,omitempty"`  // set only on decoded message rows; a pointer so cmd 0 (LOGIN) still stores
+	Name  string    `bson:"name,omitempty"` // command name on message rows
 	N     int       `bson:"n,omitempty"`
 	Data  []byte    `bson:"data,omitempty"`
 	Line  string    `bson:"line,omitempty"`
