@@ -5,6 +5,7 @@ NGROK      = $(if $(wildcard ./ngrok),./ngrok,ngrok)
 NGROK_CFG  ?= $(HOME)/.config/ngrok/ngrok.yml
 BORE       = $(if $(wildcard ./bore),./bore,bore)
 BORE_URL   := https://github.com/ekzhang/bore/releases/download/v0.6.0/bore-v0.6.0-x86_64-unknown-linux-musl.tar.gz
+BORE_PORT  ?= 40000
 MONGO_NAME ?= vps-proxy-mongo
 MONGO_PORT ?= 27017
 MONGO_IMG  ?= mongo:7
@@ -78,8 +79,8 @@ up: env build dumpread mongo-up bore-local  ## MOT LENH: mongo + proxy + bore.pu
 	@./$(BIN) & PID=$$!; \
 	  trap "kill -INT $$PID 2>/dev/null" EXIT; \
 	  trap "kill -INT $$PID 2>/dev/null; exit 0" INT TERM; \
-	  sleep 1; echo "=> dung: http://<user>:<pass>@bore.pub:<PORT o dong duoi>"; echo "=> doc log: ./dumpread"; \
-	  $(BORE) local $(HTTP_PORT) --to bore.pub
+	  sleep 1; echo "=> dia chi co dinh: http://<user>:<pass>@bore.pub:$(BORE_PORT)"; echo "=> doc log: ./dumpread"; \
+	  $(BORE) local $(HTTP_PORT) --to bore.pub --port $(BORE_PORT)
 
 up-ngrok: env build dumpread mongo-up ngrok-local ngrok-setup  ## nhu up nhung qua ngrok (CAN khai the ngrok)
 	@./$(BIN) & PID=$$!; \
@@ -88,7 +89,7 @@ up-ngrok: env build dumpread mongo-up ngrok-local ngrok-setup  ## nhu up nhung q
 	  sleep 1; $(NGROK) tcp $(HTTP_PORT)
 
 tunnel:         ## chi mo bore (proxy phai dang chay san)
-	$(BORE) local $(HTTP_PORT) --to bore.pub
+	$(BORE) local $(HTTP_PORT) --to bore.pub --port $(BORE_PORT)
 
 logs:           ## xem log tren VPS
 	ssh $(VPS) journalctl -u proxy -f

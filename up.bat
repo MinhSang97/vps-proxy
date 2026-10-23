@@ -15,9 +15,13 @@ if not exist ".env" (
 
 REM --- port tu .env ---
 set "HTTP_ADDR=:8080"
+set "BORE_PORT=40000"
 for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
   set "k=%%A"
-  if not "!k:~0,1!"=="#" if /i "%%A"=="HTTP_ADDR" set "HTTP_ADDR=%%B"
+  if not "!k:~0,1!"=="#" (
+    if /i "%%A"=="HTTP_ADDR" set "HTTP_ADDR=%%B"
+    if /i "%%A"=="BORE_PORT" set "BORE_PORT=%%B"
+  )
 )
 for /f "tokens=2 delims=:" %%P in ("!HTTP_ADDR!") do set "PORT=%%P"
 if "!PORT!"=="" set "PORT=8080"
@@ -47,7 +51,8 @@ if "!BORE!"=="" (
 )
 
 echo.
-echo => Proxy chay cong !PORT!. Dia chi cong khai o dong "listening at bore.pub:XXXXX" ben duoi.
-echo => AutoPro proxy:  http:bore.pub:^<XXXXX^>:user:pass   (lay dung port o dong duoi)
+echo => Dia chi co dinh:  bore.pub:!BORE_PORT!
+echo => AutoPro proxy:  http:bore.pub:!BORE_PORT!:user:pass
+echo => Neu bao port da bi chiem, doi BORE_PORT trong .env sang so khac.
 echo.
-%BORE% local !PORT! --to bore.pub
+%BORE% local !PORT! --to bore.pub --port !BORE_PORT!
