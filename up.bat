@@ -1,8 +1,7 @@
 @echo off
-REM One command for Windows: build (if Go), run proxy, open a playit.gg TCP tunnel.
+REM One command for Windows: build (if Go), run proxy, open a free TCP tunnel.
 REM make up is for Linux; on Windows run this: up.bat
-REM playit.gg: free, no credit card, stable address. First run needs a one-time
-REM web setup (claim account + create a TCP tunnel to 127.0.0.1:PORT).
+REM Tunnel is bore.pub: free, no account, no credit card, no setup.
 setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
@@ -32,21 +31,20 @@ if not exist "proxy.exe" (
 echo Starting proxy on port !PORT!...
 start "vps-proxy" /min proxy.exe
 
-REM --- playit: tu tai neu chua co ---
-if not exist "playit.exe" (
-  echo Tai playit...
-  curl -sL -o playit.exe https://github.com/playit-cloud/playit-agent/releases/latest/download/playit-windows-x86_64-signed.exe
-)
-if not exist "playit.exe" (
-  echo Tai playit that bai, tai tay o https://playit.gg/download
-  exit /b 1
+REM --- bore: tu tai neu chua co (khong can the, khong can tai khoan, khong setup) ---
+set "BORE="
+where bore >nul 2>nul && set "BORE=bore"
+if exist "bore.exe" set "BORE=bore.exe"
+if "!BORE!"=="" (
+  echo Tai bore...
+  curl -sL -o bore.zip https://github.com/ekzhang/bore/releases/download/v0.6.0/bore-v0.6.0-x86_64-pc-windows-msvc.zip
+  tar -xf bore.zip bore.exe
+  del bore.zip >nul 2>nul
+  if exist "bore.exe" ( set "BORE=bore.exe" ) else ( echo Tai bore that bai. & exit /b 1 )
 )
 
 echo.
-echo === LAN DAU DUNG PLAYIT ===
-echo 1. playit se in mot link - mo bang trinh duyet, dang nhap/tao tai khoan free.
-echo 2. Trong trang playit, tao 1 tunnel loai TCP tro toi  127.0.0.1:!PORT!
-echo 3. playit cho dia chi co dinh:  ^<ten^>.gl.at.ply.gg:^<PORT^>
-echo 4. AutoPro proxy:  http:^<dia-chi-playit^>:^<PORT^>:user:pass
+echo => Proxy chay cong !PORT!. Dia chi cong khai o dong "listening at bore.pub:XXXXX" ben duoi.
+echo => AutoPro proxy:  http:bore.pub:^<XXXXX^>:user:pass   (lay dung port o dong duoi)
 echo.
-playit.exe
+%BORE% local !PORT! --to bore.pub
