@@ -11,6 +11,8 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
+
+	"vps-proxy/internal/nro"
 )
 
 func readMongo(uri, db, coll, only string) ([]record, error) {
@@ -63,4 +65,57 @@ func readMongo(uri, db, coll, only string) ([]record, error) {
 		})
 	}
 	return out, cur.Err()
+}
+
+// backfillText fills the text field on message rows captured before that field
+// existed, so their readable strings (logins, chat) show up in Atlas too. It
+// only touches rows that have no text yet and whose payload actually decodes to
+// some text, and never changes the stored data. Returns how many rows it set.
+func backfillText(uri, db, coll string) (int, error) {
+	opts := options.Client().ApplyURI(uri).SetServerSelectionTimeout(8 * time.Second)
+	if user := os.Getenv("MONGO_USERNAME"); user != "" {
+		opts.SetAuth(options.Credential{Username: user, Password: os.Getenv("MONGO_PASS")})
+	}
+	client, err := mongo.Connect(opts)
+	if err != nil {
+		return 0, err
+	}
+	ctx := context.Background()
+	defer client.Disconnect(ctx)
+	c := client.Database(db).Collection(coll)
+
+	cur, err := c.Find(ctx, bson.M{"kind": "message", "text": bson.M{"$exists": false}})
+	if err != nil {
+		return 0, err
+	}
+	defer cur.Close(ctx)
+
+	var models []mongo.WriteModel
+	for cur.Next(ctx) {
+		var r struct {
+			ID   bson.ObjectID `bson:"_id"`
+			Data []byte        `bson:"data"`
+		}
+		if err := cur.Decode(&r); err != nil {
+			return 0, err
+		}
+		texts := nro.Text(r.Data)
+		if len(texts) == 0 {
+			continue
+		}
+		models = append(models, mongo.NewUpdateOneModel().
+			SetFilter(bson.M{"_id": r.ID}).
+			SetUpdate(bson.M{"$set": bson.M{"text": texts}}))
+	}
+	if err := cur.Err(); err != nil {
+		return 0, err
+	}
+	if len(models) == 0 {
+		return 0, nil
+	}
+	res, err := c.BulkWrite(ctx, models)
+	if err != nil {
+		return 0, err
+	}
+	return int(res.ModifiedCount), nil
 }

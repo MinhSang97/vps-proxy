@@ -31,7 +31,22 @@ func main() {
 	mongoURI := flag.String("mongo", os.Getenv("MONGO_URI"), "read from this MongoDB instead of a file, used when no file is named")
 	mongoDB := flag.String("mongo-db", envOr("MONGO_DB", "vps_proxy"), "database holding the capture")
 	mongoColl := flag.String("mongo-coll", envOr("MONGO_COLL", "logs"), "collection holding the capture")
+	backfill := flag.Bool("backfill", false, "fill the text field on older message rows in mongo, then exit")
 	flag.Parse()
+
+	if *backfill {
+		if *mongoURI == "" {
+			fmt.Fprintln(os.Stderr, "backfill needs MONGO_URI (set it in .env)")
+			os.Exit(2)
+		}
+		n, err := backfillText(*mongoURI, *mongoDB, *mongoColl)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "backfill: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("backfilled text on %d message rows\n", n)
+		return
+	}
 
 	// No file named: read the capture out of the database the proxy writes to.
 	if flag.NArg() == 0 {
